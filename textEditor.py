@@ -13,6 +13,7 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         self.cursor_visible = True
         #self.blink_cursor()
         self.menu()
+        self.statusBar = tkinter.Label(master, text="Line: 1, Column: 1", bd=1, relief=tkinter.SUNKEN, anchor=tkinter.W)
         self.focus_set()
 
         #2.4
@@ -45,8 +46,8 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         self.master.config(menu=self.menu)
 
         file_menu = tkinter.Menu(self.menu, tearoff=0)
-        file_menu.add_command(label="Open", command="")
-        file_menu.add_command(label="Save", command="")
+        file_menu.add_command(label="Open", command=self.openFile)
+        file_menu.add_command(label="Save", command=self.save)
         file_menu.add_command(label="Exit", command=self.closeWindow)
         self.menu.add_cascade(label="File", menu=file_menu)
 
@@ -67,6 +68,14 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         move_menu.add_command(label="Cursor to document start", command=self.cursorToStart)
         move_menu.add_command(label="Cursor to document end", command=self.cursorToEnd)
         self.menu.add_cascade(label="Move", menu=move_menu)
+
+    def openFile(self):
+        with open("text.txt", "r") as file:
+            self.model.setText(file.read())
+
+    def save(self):
+        with open("text.txt", "w") as file:
+            file.write(self.model.getText())
 
     def clearDocument(self):
         self.model.clear()
@@ -179,4 +188,12 @@ class TextEditor(CursorObserver, tkinter.Canvas):
 
 
         self.updateCursorLocation(self.model.cursorLocation)
+
+        #status bar that shows the current line and column of the cursor and number of lines in the document
+        self.statusBar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
+        self.statusBar.config(text=f"Line: {self.model.cursorLocation.y + 1}, Column: {self.model.cursorLocation.x + 1}, Number of lines: {len(self.model.lines)}")
+
+
+
+
         self.pack()

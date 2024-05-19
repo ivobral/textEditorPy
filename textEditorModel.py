@@ -18,6 +18,16 @@ class TextEditorModel:
         self.text_observers = []
         self.clipboard = ClipboardStack()
 
+    def setText(self, text):
+        self.lines = text.split("\n")
+        self.cursorLocation = Location(0, 0)
+        self.selectionRange = None
+        self.notifyTextObservers()
+        self.notifyCursorObservers()
+
+    def getText(self):
+        return "\n".join(self.lines)
+
     def clear(self):
         self.lines = [""]
         self.cursorLocation = Location(0, 0)
