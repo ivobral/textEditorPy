@@ -16,6 +16,9 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         self.statusBar = tkinter.Label(master, text="Line: 1, Column: 1", bd=1, relief=tkinter.SUNKEN, anchor=tkinter.W)
         self.focus_set()
 
+        #close the window using Alt+F4
+        self.bind("<Alt-F4>", lambda e: self.closeWindow())
+
         #2.4
         self.bind("<Left>", lambda e: self.model.moveCursorLeft())
         self.bind("<Right>", lambda e: self.model.moveCursorRight())
@@ -191,7 +194,7 @@ class TextEditor(CursorObserver, tkinter.Canvas):
 
         #status bar that shows the current line and column of the cursor and number of lines in the document
         self.statusBar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
-        self.statusBar.config(text=f"Line: {self.model.cursorLocation.y + 1}, Column: {self.model.cursorLocation.x + 1}, Number of lines: {len(self.model.lines)}")
+        self.statusBar.config(text=f"Ln: {self.model.cursorLocation.y + 1}, Col: {self.model.cursorLocation.x + 1}, Number of lines: {len(self.model.lines)}")
 
 
 
