@@ -2,6 +2,9 @@ import tkinter
 from textEditorModel import TextEditorModel
 from CursorObserver import CursorObserver
 from Location import Location
+import os
+import importlib
+from Plugins.PluginInterface import PluginInterface
 
 
 class TextEditor(CursorObserver, tkinter.Canvas):
@@ -12,8 +15,10 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         self.model.addTextObserver(self)
         self.cursor_visible = True
         #self.blink_cursor()
+        self.plugins = self.loadPlugin()
         self.menu()
         self.statusBar = tkinter.Label(master, text="Line: 1, Column: 1", bd=1, relief=tkinter.SUNKEN, anchor=tkinter.W)
+        
         self.focus_set()
 
         #close the window using Alt+F4
@@ -44,6 +49,22 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         self.bind('<Control-z>', lambda e: self.undo())
         self.bind('<Control-y>', lambda e: self.redo())
 
+    #method for loading plugins
+    def loadPlugin(self):
+        plugins = []
+        for file in os.listdir("Plugins"):
+            if file.endswith(".py"):
+                plugin_name = file[:-3]
+                spec = importlib.util.spec_from_file_location(plugin_name, os.path.join("Plugins", file))
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                for name, obj in module.__dict__.items():
+                    if isinstance(obj, type) and issubclass(obj, PluginInterface) and obj is not PluginInterface:
+                        plugins.append(obj())
+        return plugins
+    
+    
+
     def menu(self):
         self.menu = tkinter.Menu(self.master)
         self.master.config(menu=self.menu)
@@ -71,6 +92,13 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         move_menu.add_command(label="Cursor to document start", command=self.cursorToStart)
         move_menu.add_command(label="Cursor to document end", command=self.cursorToEnd)
         self.menu.add_cascade(label="Move", menu=move_menu)
+
+        # Plugins menu
+        plugins_menu = tkinter.Menu(self.menu, tearoff=0)
+        for plugin in self.plugins:
+            plugins_menu.add_command(label=plugin.getName(), command=lambda plugin=plugin: plugin.execute(self.model, None))
+        self.menu.add_cascade(label="Plugins", menu=plugins_menu)
+
 
     def openFile(self):
         with open("text.txt", "r") as file:
