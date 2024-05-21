@@ -1,15 +1,14 @@
 from Location import Location
 from LocationRange import LocationRange
+from Iterators import AllLines, LinesRange
 from TextObserver import TextObserver
 from CursorObserver import CursorObserver
 from copy import deepcopy
 from Clipboard import ClipboardStack
 
-
-
-
 class TextEditorModel:
     def __init__(self, text):
+        #2.2
         self.lines = text.split("\n")
         self.cursorLocation = Location(0, 0)
         self.selectionRange = None
@@ -35,8 +34,6 @@ class TextEditorModel:
         self.notifyTextObservers()
         self.notifyCursorObservers()
 
-    
-
     def copySelection(self):
         if self.selectionRange is not None:
             text = self.get_text_from_range(self.selectionRange)
@@ -59,8 +56,6 @@ class TextEditorModel:
         text = self.clipboard.pop()
         if text is not None:
             self.insert(text)
-
-
 
     def get_text_from_range(self, selected):
         if selected:
@@ -99,8 +94,6 @@ class TextEditorModel:
         self.notifyTextObservers()
         self.notifyCursorObservers()
 
-        
-
     #method to insert a string at the cursor location and update the cursor location
     def insertText(self, text):
         if self.selectionRange is not None:
@@ -119,8 +112,6 @@ class TextEditorModel:
 
         self.notifyTextObservers()
         self.notifyCursorObservers()
-
-    
 
     #2.5
     def addTextObserver(self, observer: TextObserver):
@@ -319,7 +310,7 @@ class TextEditorModel:
 
     #2.3
     def allLines(self):
-        return iter(self.lines)
+        return AllLines(self.lines)
     
     def linesRange(self, index1, index2):
-        return iter(self.lines[index1:index2])
+        return LinesRange(self.lines, index1, index2)

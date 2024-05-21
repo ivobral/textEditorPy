@@ -7,10 +7,12 @@ import importlib
 from Plugins.PluginInterface import PluginInterface
 
 
-class TextEditor(CursorObserver, tkinter.Canvas):
+class TextEditor(tkinter.Canvas):
     def __init__(self, model: TextEditorModel, master=None, **kwargs):
+        #2.2
         super().__init__(master, **kwargs)
         self.model = model
+
         self.model.addCursorObserver(self)
         self.model.addTextObserver(self)
         self.cursor_visible = True
@@ -63,8 +65,6 @@ class TextEditor(CursorObserver, tkinter.Canvas):
                         plugins.append(obj())
         return plugins
     
-    
-
     def menu(self):
         self.menu = tkinter.Menu(self.master)
         self.master.config(menu=self.menu)
@@ -99,7 +99,6 @@ class TextEditor(CursorObserver, tkinter.Canvas):
             plugins_menu.add_command(label=plugin.getName(), command=lambda plugin=plugin: plugin.execute(self.model, None))
         self.menu.add_cascade(label="Plugins", menu=plugins_menu)
 
-
     def openFile(self):
         with open("text.txt", "r") as file:
             self.model.setText(file.read())
@@ -127,7 +126,6 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         self.model.selectionRange = None
         self.show()
 
-
     def copySelection(self):
         selected = self.model.getSelectionRange()
         if selected:
@@ -149,7 +147,6 @@ class TextEditor(CursorObserver, tkinter.Canvas):
 
     def redo(self):
         pass
-
 
     def keyPressed(self, char):
         if char.isalnum() or char.isspace():
@@ -191,7 +188,9 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         self.drawCursor(self.model.cursorLocation) if self.cursor_visible else self.delete("cursor")
         self.after(500, self.blink_cursor)
 
+    #2.2, 
     def show(self):
+        #2.2
         y_offset = 10
         for line in self.model.allLines():
             self.create_text(10, y_offset, text=line, anchor="nw", font=("Courier", 15))
@@ -223,8 +222,5 @@ class TextEditor(CursorObserver, tkinter.Canvas):
         #status bar that shows the current line and column of the cursor and number of lines in the document
         self.statusBar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
         self.statusBar.config(text=f"Ln: {self.model.cursorLocation.y + 1}, Col: {self.model.cursorLocation.x + 1}, Number of lines: {len(self.model.lines)}")
-
-
-
-
+        #2.2
         self.pack()
