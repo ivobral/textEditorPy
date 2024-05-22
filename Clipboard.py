@@ -1,7 +1,6 @@
-class ClipboardObserver:
-    def updateClipboard(self):
-        pass
+from Observers import ClipboardObserver
 
+#2.7
 class ClipboardStack:
     def __init__(self):
         self.texts = []

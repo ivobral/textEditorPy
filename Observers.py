@@ -16,3 +16,13 @@ class CursorObserverHelper(CursorObserver):
 class TextObserver:
     def updateText(self):
         pass
+
+#2.7
+class ClipboardObserver:
+    def updateClipboard(self):
+        pass
+
+#2.9
+class SelectionObserver:
+    def selectionChanged(self):
+        pass

@@ -1,5 +1,6 @@
 from Plugins.PluginInterface import PluginInterface
 from tkinter import messagebox
+from Clipboard import ClipboardStack
 
 class StatisticsPlugin(PluginInterface):
     def getName(self):
@@ -8,7 +9,7 @@ class StatisticsPlugin(PluginInterface):
     def getDescriptions(self):
         return "This plugin calculates number of lines, words and characters in the text."
     
-    def execute(self, model, clipboardStack):
+    def execute(self, model, clipboardStack: ClipboardStack): 
         text = model.getText()
         lines = len(text.split("\n"))
         words = len(text.split())
