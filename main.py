@@ -10,6 +10,7 @@ def main():
     editor = TextEditor(model, root, width=400, height=400, bg="#e6fffa")
 
     editor.show()
+    editor.cursorToEnd()
 
     root.mainloop()
 

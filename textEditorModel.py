@@ -1,8 +1,8 @@
 from Location import Location
 from LocationRange import LocationRange
 from Iterators import AllLines, LinesRange
-from TextObserver import TextObserver
-from CursorObserver import CursorObserver
+from Observers import CursorObserver, TextObserver
+
 from copy import deepcopy
 from Clipboard import ClipboardStack
 
@@ -12,9 +12,13 @@ class TextEditorModel:
         self.lines = text.split("\n")
         self.cursorLocation = Location(0, 0)
         self.selectionRange = None
+        #2.4
+        self.cursorObservers = []
+        
+        #2.5
+        self.textObservers = []
+        """
 
-        self.cursor_observers = []
-        self.text_observers = []
         self.clipboard = ClipboardStack()
 
     def setText(self, text):
@@ -71,12 +75,12 @@ class TextEditorModel:
                     selectedText.append(self.lines[i])
                 selectedText.append(self.lines[end.y][:end.x])
                 return "\n".join(selectedText)
-
-    #method to insert a character at the cursor location and update the cursor location
+    """
+    #2.6
     def insert(self, c):
-        if self.selectionRange is not None:
-            self.deleteRange(self.selectionRange)
-            self.selectionRange = None
+        if self.getSelectionRange() is not None:
+            self.deleteRange(self.getSelectionRange())
+            self.setSelectionRange(None)
 
         #if the character is a newline character then split the line at the cursor location
         if c == "\n" or c == "\r":
@@ -84,7 +88,7 @@ class TextEditorModel:
             self.lines[self.cursorLocation.y] = self.lines[self.cursorLocation.y][:self.cursorLocation.x]
             self.cursorLocation.y += 1
             self.cursorLocation.x = 0
-        else:
+        else:  #if the character is not a newline character then insert the character at the cursor location
             y = self.cursorLocation.y
             x = self.cursorLocation.x
 
@@ -93,8 +97,7 @@ class TextEditorModel:
         
         self.notifyTextObservers()
         self.notifyCursorObservers()
-
-    #method to insert a string at the cursor location and update the cursor location
+    """
     def insertText(self, text):
         if self.selectionRange is not None:
             self.deleteRange(self.selectionRange)
@@ -112,50 +115,58 @@ class TextEditorModel:
 
         self.notifyTextObservers()
         self.notifyCursorObservers()
-
+    """
     #2.5
     def addTextObserver(self, observer: TextObserver):
-        self.text_observers.append(observer)
+        self.textObservers.append(observer)
 
     def removeTextObserver(self, observer: TextObserver):
-        self.text_observers.remove(observer)
+        self.textObservers.remove(observer)
 
     def notifyTextObservers(self):
-        for observer in self.text_observers:
+        for observer in self.textObservers:
             observer.updateText()
 
     def deleteBefore(self):
-        if self.selectionRange is not None:
-            self.deleteRange(self.selectionRange)
+        if self.selectionRange is not None:                 #if there is a selection range then delete the selected text
+            self.deleteRange(self.getSelectionRange())
             self.selectionRange = None
             self.notifyTextObservers()
+            self.notifyCursorObservers()
             return
-        if self.cursorLocation.x > 0:
+        
+        if self.cursorLocation.x > 0:                       #if the cursor is not at the beginning of the line
             self.lines[self.cursorLocation.y] = self.lines[self.cursorLocation.y][:self.cursorLocation.x-1] + self.lines[self.cursorLocation.y][self.cursorLocation.x:]
             self.cursorLocation.x -= 1
+
             self.notifyTextObservers()
-            #self.notifyCursorObservers()
-        elif self.cursorLocation.y > 0:
+            self.notifyCursorObservers()
+        elif self.cursorLocation.y > 0:                     #if the cursor is at the beginning of the line
             self.cursorLocation.y -= 1
             self.cursorLocation.x = len(self.lines[self.cursorLocation.y])
             self.lines[self.cursorLocation.y] += self.lines.pop(self.cursorLocation.y+1)
+            
             self.notifyTextObservers()
-            #self.notifyCursorObservers()
+            self.notifyCursorObservers()
             
     def deleteAfter(self):
         if self.selectionRange is not None:
-            self.deleteRange(self.selectionRange)
+            self.deleteRange(self.getSelectionRange())
             self.selectionRange = None
             self.notifyTextObservers()
+            self.notifyCursorObservers()
             return
-        if self.cursorLocation.x < len(self.lines[self.cursorLocation.y]):
+        
+        if self.cursorLocation.x < len(self.lines[self.cursorLocation.y]):              #if the cursor is not at the end of the line
             self.lines[self.cursorLocation.y] = self.lines[self.cursorLocation.y][:self.cursorLocation.x] + self.lines[self.cursorLocation.y][self.cursorLocation.x+1:]
+            
             self.notifyTextObservers()
-            #self.notifyCursorObservers()
-        elif self.cursorLocation.y < len(self.lines) - 1:
+            self.notifyCursorObservers()
+        elif self.cursorLocation.y < len(self.lines) - 1:                               #if the cursor is at the end of the line
             self.lines[self.cursorLocation.y] += self.lines.pop(self.cursorLocation.y+1)
+            
             self.notifyTextObservers()
-            #self.notifyCursorObservers()
+            self.notifyCursorObservers()
 
     def deleteRange(self, r: LocationRange):
         # Ensure start is before end
@@ -170,9 +181,7 @@ class TextEditorModel:
             del self.lines[start.y + 1:end.y + 1]
 
         self.cursorLocation = deepcopy(start)
-        self.selectionRange = None
-        self.notifyTextObservers()
-        self.notifyCursorObservers()
+        self.setSelectionRange(None)
 
     def getSelectionRange(self):
         return self.selectionRange
@@ -181,15 +190,14 @@ class TextEditorModel:
         self.selectionRange = r
         self.notifyTextObservers()
 
-    def update_selection_range_left(self):
+    def selectionRangeLeft(self):
         #this is the case when the cursor is at the beginning of the first line
         if self.cursorLocation.x <= 0 and self.cursorLocation.y == 0:
-            self.notifyTextObservers()
             return
         
         #this is the case when the selection range is None
-        if self.selectionRange is None:
-            self.selectionRange = LocationRange(deepcopy(self.cursorLocation), deepcopy(self.cursorLocation))
+        if self.getSelectionRange() is None:
+            self.setSelectionRange(LocationRange(deepcopy(self.cursorLocation), deepcopy(self.cursorLocation)))
         
         #this is the case when the cursor is not at the beginning of the line
         if self.cursorLocation.x > 0:
@@ -199,20 +207,18 @@ class TextEditorModel:
                 self.cursorLocation.y -= 1
                 self.cursorLocation.x = len(self.lines[self.cursorLocation.y])
 
-        #this is the case when the cursor is at the beginning of the first line
-        self.selectionRange.end = deepcopy(self.cursorLocation)
-        self.notifyCursorObservers()
+        self.getSelectionRange().end= deepcopy(self.cursorLocation)
         self.notifyTextObservers()
+        self.notifyCursorObservers()
 
-    def update_selection_range_right(self):
+    def selectionRangeRight(self):
         #this is the case when the cursor is at the end of the last line
         if self.cursorLocation.x >= len(self.lines[self.cursorLocation.y]) and self.cursorLocation.y == len(self.lines) - 1:
-            self.notifyTextObservers()
             return
 
         #this is the case when the selection range is None
-        if self.selectionRange is None:
-            self.selectionRange = LocationRange(deepcopy(self.cursorLocation), deepcopy(self.cursorLocation))
+        if self.getSelectionRange() is None:
+            self.setSelectionRange(LocationRange(deepcopy(self.cursorLocation), deepcopy(self.cursorLocation)))
 
         #this is the case when the cursor is not at the end of the line
         if self.cursorLocation.x < len(self.lines[self.cursorLocation.y]):
@@ -223,89 +229,90 @@ class TextEditorModel:
                 self.cursorLocation.x = 0
 
         #this is the case when the cursor is at the end of the last line
-        self.selectionRange.end = deepcopy(self.cursorLocation)
-        self.notifyCursorObservers()
+        self.getSelectionRange().end = deepcopy(self.cursorLocation)
         self.notifyTextObservers()
+        self.notifyCursorObservers()
 
-    def update_selection_range_up(self):
-        if self.selectionRange is None:
-            self.selectionRange = LocationRange(deepcopy(self.cursorLocation), deepcopy(self.cursorLocation))
+    def selectionRangeUp(self):
+        if self.getSelectionRange() is None:
+            self.setSelectionRange(LocationRange(deepcopy(self.cursorLocation), deepcopy(self.cursorLocation)))
 
         if self.cursorLocation.y > 0:
             self.cursorLocation.y -= 1
             self.cursorLocation.x = min(self.cursorLocation.x, len(self.lines[self.cursorLocation.y]))
 
-        self.selectionRange.end = deepcopy(self.cursorLocation)
-        self.notifyCursorObservers()
+        self.getSelectionRange().end = deepcopy(self.cursorLocation)
         self.notifyTextObservers()
+        self.notifyCursorObservers()
 
-    def update_selection_range_down(self):
-        if self.selectionRange is None:
-            self.selectionRange = LocationRange(deepcopy(self.cursorLocation), deepcopy(self.cursorLocation))
+    def selectionRangeDown(self):
+        if self.getSelectionRange() is None:
+            self.setSelectionRange(LocationRange(deepcopy(self.cursorLocation), deepcopy(self.cursorLocation)))
 
         if self.cursorLocation.y < len(self.lines) - 1:
             self.cursorLocation.y += 1
             self.cursorLocation.x = min(self.cursorLocation.x, len(self.lines[self.cursorLocation.y]))
 
-        self.selectionRange.end = deepcopy(self.cursorLocation)
-        self.notifyCursorObservers()
+        self.getSelectionRange().end = deepcopy(self.cursorLocation)
         self.notifyTextObservers()
+        self.notifyCursorObservers()
 
     #2.4
     def addCursorObserver(self, observer: CursorObserver):
-        self.cursor_observers.append(observer)
+        self.cursorObservers.append(observer)
 
     def removeCursorObserver(self, observer: CursorObserver):
-        self.cursor_observers.remove(observer)
+        self.cursorObservers.remove(observer)
 
     def notifyCursorObservers(self):
-        for observer in self.cursor_observers:
+        for observer in self.cursorObservers:
+            #print(observer.__class__.__name__)
             observer.updateCursorLocation(self.cursorLocation)
 
     def moveCursorLeft(self):
-        if self.cursorLocation.x > 0:
+        if self.cursorLocation.x > 0:           #if the cursor is not at the beginning of the line
             self.cursorLocation.x -= 1
-            self.selectionRange = None
-            self.notifyTextObservers()
+
+            self.setSelectionRange(None)
             self.notifyCursorObservers()
-        else:
-            if self.cursorLocation.y > 0:
+            
+        else:                                   #if the cursor is at the beginning of the line
+            if self.cursorLocation.y > 0:       #if the cursor is not at the beginning of the first line
                 self.cursorLocation.y -= 1
                 self.cursorLocation.x = len(self.lines[self.cursorLocation.y])
-                self.selectionRange = None
-                self.notifyTextObservers()
+
+                self.setSelectionRange(None)
                 self.notifyCursorObservers()
 
     def moveCursorRight(self):
-        if self.cursorLocation.x < len(self.lines[self.cursorLocation.y]):
+        if self.cursorLocation.x < len(self.lines[self.cursorLocation.y]):    #if the cursor is not at the end of the line
             self.cursorLocation.x += 1
-            self.selectionRange = None
-            self.notifyTextObservers()
+
+            self.setSelectionRange(None)
             self.notifyCursorObservers()
-        elif self.cursorLocation.y == len(self.lines) - 1:
+        elif self.cursorLocation.y == len(self.lines) - 1:                      #if the cursor is at the end of the last line
             pass
-        else:
+        else:                                                                   #if the cursor is at the end of the line
             self.cursorLocation.x = 0
             self.cursorLocation.y += 1
-            self.selectionRange = None
-            self.notifyTextObservers()
+
+            self.setSelectionRange(None)
             self.notifyCursorObservers()
 
     def moveCursorUp(self):
         if self.cursorLocation.y > 0:
             self.cursorLocation.y -= 1
             self.cursorLocation.x = min(self.cursorLocation.x, len(self.lines[self.cursorLocation.y]))
-            self.selectionRange = None
-            self.notifyTextObservers()
+
+            self.setSelectionRange(None)
             self.notifyCursorObservers()
 
     def moveCursorDown(self):
-        self.selectionRange = None
         if self.cursorLocation.y < len(self.lines) - 1:
             self.cursorLocation.y += 1
             self.cursorLocation.x = min(self.cursorLocation.x, len(self.lines[self.cursorLocation.y]))
-            self.selectionRange = None
-            self.notifyTextObservers()
+
+            self.setSelectionRange(None)
             self.notifyCursorObservers()
 
     #2.3

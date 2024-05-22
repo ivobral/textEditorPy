@@ -1,28 +1,37 @@
 import tkinter
-from textEditorModel import TextEditorModel
-from CursorObserver import CursorObserver
 from Location import Location
+from textEditorModel import TextEditorModel
+from Observers import CursorObserver, CursorObserverHelper
+
 import os
 import importlib
 from Plugins.PluginInterface import PluginInterface
 
 
-class TextEditor(tkinter.Canvas):
+class TextEditor(tkinter.Canvas, CursorObserver):
     def __init__(self, model: TextEditorModel, master=None, **kwargs):
         #2.2
         super().__init__(master, **kwargs)
         self.model = model
-
+        self.focus_set()
+    
+        #2.4
         self.model.addCursorObserver(self)
-        self.model.addTextObserver(self)
         self.cursor_visible = True
         #self.blink_cursor()
+        self.cursorObserverHelper = CursorObserverHelper(self)
+        self.model.addCursorObserver(self.cursorObserverHelper)
+
+        #2.5
+        self.model.addTextObserver(self)
+        """
+
         self.plugins = self.loadPlugin()
         self.menu()
         self.statusBar = tkinter.Label(master, text="Line: 1, Column: 1", bd=1, relief=tkinter.SUNKEN, anchor=tkinter.W)
         
-        self.focus_set()
-
+        
+        """
         #close the window using Alt+F4
         self.bind("<Alt-F4>", lambda e: self.closeWindow())
 
@@ -36,13 +45,14 @@ class TextEditor(tkinter.Canvas):
         self.bind("<BackSpace>", lambda e: self.model.deleteBefore())
         self.bind("<Delete>", lambda e: self.model.deleteAfter())
 
-        self.bind('<Shift-Left>', self.shift_left)
-        self.bind('<Shift-Right>', self.shift_right)
-        self.bind('<Shift-Up>', self.shift_up)
-        self.bind('<Shift-Down>', self.shift_down)
-        
-        self.bind('<Key>', lambda e: self.keyPressed(e.char))
+        self.bind('<Shift-Left>', lambda e: self.model.selectionRangeLeft())
+        self.bind('<Shift-Right>', lambda e: self.model.selectionRangeRight())
+        self.bind('<Shift-Up>', lambda e: self.model.selectionRangeUp())
+        self.bind('<Shift-Down>', lambda e: self.model.selectionRangeDown())
 
+        #2.6
+        self.bind('<Key>', lambda e: self.keyPressed(e.char))
+        """
         self.bind('<Control-c>', lambda e: self.copySelection())
         self.bind('<Control-x>', lambda e: self.cutSelection())
         self.bind('<Control-v>', lambda e: self.paste())
@@ -120,12 +130,13 @@ class TextEditor(tkinter.Canvas):
         self.model.cursorLocation = Location(0, 0)
         self.model.selectionRange = None
         self.show()
-
+    """
     def cursorToEnd(self):
         self.model.cursorLocation = Location(len(self.model.lines[-1]), len(self.model.lines) - 1)
         self.model.selectionRange = None
+        self.drawCursor(self.model.cursorLocation)
         self.show()
-
+    """
     def copySelection(self):
         selected = self.model.getSelectionRange()
         if selected:
@@ -147,80 +158,75 @@ class TextEditor(tkinter.Canvas):
 
     def redo(self):
         pass
-
+    """
+    #2.6
     def keyPressed(self, char):
-        if char.isalnum() or char.isspace():
-            self.model.insert(char)
-        elif char == "\r":
-            self.model.insert("\n")
-        
+        if char:
+            if char.isalnum() or char in ".,;:?!-()[]{} ":
+                self.model.insert(char)
+            elif char == "\r" or char == "\n":
+                self.model.insert("\n")
+        else:
+            pass
+
     #2.5
     def updateText(self):
         self.delete("all")
         self.show()
 
-    def shift_left(self, event):
-        self.model.update_selection_range_left()
-
-    def shift_right(self, event):
-        self.model.update_selection_range_right()
-
-    def shift_up(self, event):
-        self.model.update_selection_range_up()
-
-    def shift_down(self, event):
-        self.model.update_selection_range_down()
-
     #2.4
     def updateCursorLocation(self, loc):
         self.drawCursor(loc)
+        #2.10
+        #self.statusBar.config(text=f"Ln: {loc.y + 1}, Col: {loc.x + 1}, Number of lines: {len(self.model.lines)}")
 
     def drawCursor(self, location):
         self.delete("cursor")
 
-        x = 10 + location.x * 12
-        y = 10 + location.y * 20
+        x = 10 + location.x * 12    #width of a character
+        y = 10 + location.y * 20    #height of a character
 
         self.create_rectangle(x, y, x+1, y+20, fill="black", tag="cursor")
-
+    
     def blink_cursor(self):
         self.cursor_visible = not self.cursor_visible
         self.drawCursor(self.model.cursorLocation) if self.cursor_visible else self.delete("cursor")
         self.after(500, self.blink_cursor)
-
-    #2.2, 
+    
+    #2.2, 2.3, 2.4, 2.5
     def show(self):
         #2.2
         y_offset = 10
         for line in self.model.allLines():
-            self.create_text(10, y_offset, text=line, anchor="nw", font=("Courier", 15))
+            self.create_text(10, y_offset, text=line, anchor="nw", font=("Courier", 15), tag="text")
             y_offset += 20
 
+        #2.5
         if self.model.selectionRange:
-            start = self.model.selectionRange.start
-            end = self.model.selectionRange.end
+            start = self.model.getSelectionRange().start
+            end = self.model.getSelectionRange().end
+
+            # Normalize the selection range so that start is before end
             if end.y < start.y or (end.y == start.y and end.x < start.x):
                 start, end = end, start
 
+            # If the selection is on a single line draw a single rectangle
             if start.y == end.y:
-                #print("1")
                 self.create_rectangle(start.x * 12 + 10, start.y * 20 + 10, end.x * 12 + 10, (end.y + 1) * 20 + 10, fill="grey", outline="", stipple="gray50")
-            else:
+            else: # If the selection spans multiple lines draw multiple rectangles
                 # First line
-                #print("2")
                 self.create_rectangle(start.x * 12 + 10, start.y * 20 + 10, len(self.model.lines[start.y]) * 12 + 10, (start.y + 1) * 20 + 10, fill="grey", outline="", stipple="gray50")
                 # Middle lines
                 for curr_row in range(start.y + 1, end.y):
                     self.create_rectangle(10, curr_row * 20 + 10, len(self.model.lines[curr_row]) * 12 + 10, (curr_row + 1) * 20 + 10, fill="grey", outline="", stipple="gray50")
                 # Last line
-                #print("3")
+    
                 self.create_rectangle(10, end.y * 20 + 10, end.x * 12 + 10, (end.y + 1) * 20 + 10, fill="grey", outline="", stipple="gray50")
+        #2.4
+        #self.updateCursorLocation(self.model.cursorLocation)
 
+        #2.10
+        #self.statusBar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
 
-        self.updateCursorLocation(self.model.cursorLocation)
-
-        #status bar that shows the current line and column of the cursor and number of lines in the document
-        self.statusBar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
-        self.statusBar.config(text=f"Ln: {self.model.cursorLocation.y + 1}, Col: {self.model.cursorLocation.x + 1}, Number of lines: {len(self.model.lines)}")
         #2.2
         self.pack()
